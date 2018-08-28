@@ -2,19 +2,21 @@
 
 declare(strict_types = 1);
 
-namespace Aggrego\Domain\ProgressiveBoard\Step\Steps;
+namespace Aggrego\Domain\Profile\BoardConstruction\InitialBoardModel;
 
+use Aggrego\Domain\Profile\Profile;
 use Aggrego\Domain\ProgressiveBoard\Step\State;
-use Aggrego\Domain\ProgressiveBoard\Step\Step;
 use Aggrego\Domain\Shared\ValueObject\Data;
+use Aggrego\Domain\Shared\ValueObject\Key;
 
-final class FinalStep implements Step
+final class FinalBoard extends AbstractBoard
 {
-    /** @var Data */
+    /** @var Data  */
     private $data;
 
-    public function __construct(Data $data)
+    public function __construct(Key $key, Profile $profile, Data $data)
     {
+        parent::__construct($key, $profile);
         $this->data = $data;
     }
 
@@ -26,10 +28,5 @@ final class FinalStep implements Step
     public function getData(): Data
     {
         return $this->data;
-    }
-
-    public function canBeTransformed(): bool
-    {
-        return !$this->getState()->isFinal();
     }
 }

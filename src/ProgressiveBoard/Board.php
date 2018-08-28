@@ -6,6 +6,8 @@ namespace Aggrego\Domain\ProgressiveBoard;
 
 use Aggrego\Domain\Api\Application\Event\Aggregate;
 use Aggrego\Domain\Profile\BoardConstruction\Builder;
+use Aggrego\Domain\Profile\BoardConstruction\InitialBoardModel\FinalBoard;
+use Aggrego\Domain\Profile\BoardConstruction\InitialBoardModel\ProgressiveBoard;
 use Aggrego\Domain\Profile\BoardTransformation\Transformation;
 use Aggrego\Domain\Profile\Profile;
 use Aggrego\Domain\ProgressiveBoard\Events\BoardCreatedEvent;
@@ -48,7 +50,7 @@ class Board implements Aggregate
     /** @var bool */
     private $isDeleted;
 
-    private function __construct(Uuid $uuid, Key $key, Profile $profile, ProgressStep $step)
+    private function __construct(Uuid $uuid, Key $key, Profile $profile, Step $step)
     {
         $this->uuid = $uuid;
         $this->key = $key;
@@ -62,23 +64,13 @@ class Board implements Aggregate
     public static function factory(Key $key, Builder $factory): self
     {
         $initialBoard = $factory->build($key);
-
-        $shardsList = [];
-        /** @var InitialItem $item */
-        foreach ($initialBoard->getShards() as $item) {
-            $shardsList[] = new InitialItem(
-                $item->getUuid(),
-                $item->getProfile(),
-                $item->getKey()
-            );
+        if ($initialBoard->getState()->isFinal()) {
+            /** @var FinalBoard $initialBoard */
+            return self::factoryFinalBoard($initialBoard);
+        } else {
+            /** @var ProgressiveBoard $initialBoard */
+            return self::factoryProgressBoard($initialBoard);
         }
-
-        return new self(
-            $initialBoard->getUuid(),
-            $initialBoard->getKey(),
-            $initialBoard->getProfile(),
-            new ProgressStep(State::createInitial(), new Collection($shardsList))
-        );
     }
 
     public function getUuid(): Uuid
@@ -114,20 +106,39 @@ class Board implements Aggregate
             throw new UnfinishedStepPassedForTransformationException();
         }
 
-        $step = $transformation->process($this->step);
+        /** @var ProgressStep $step */
+        $step = $this->step;
+        $this->setStep($transformation->process($step));
+    }
 
-        if ($step->getState()->isFinal()) {
-            /** @var FinalStep $step */
-            $this->step = $step;
-            $this->pushEvent(new FinalBoardTransformedEvent($this->uuid, $step));
+    private static function factoryFinalBoard(FinalBoard $board): self
+    {
+        return new self(
+            $board->getUuid(),
+            $board->getKey(),
+            $board->getProfile(),
+            new FinalStep($board->getData())
+        );
+    }
 
-            $this->isDeleted = true;
-            $this->pushEvent(new BoardDeletedEvent($this->uuid));
-        } else {
-            /** @var ProgressStep $step */
-            $this->pushEvent(new BoardTransformedEvent($this->uuid, $step));
-            $this->setStep($step);
+    private static function factoryProgressBoard(ProgressiveBoard $board): self
+    {
+        $shardsList = [];
+        /** @var InitialItem $item */
+        foreach ($board->getShards() as $item) {
+            $shardsList[] = new InitialItem(
+                $item->getUuid(),
+                $item->getProfile(),
+                $item->getKey()
+            );
         }
+
+        return new self(
+            $board->getUuid(),
+            $board->getKey(),
+            $board->getProfile(),
+            new ProgressStep(State::createInitial(), new Collection($shardsList))
+        );
     }
 
     private function isStepReadyForNextTransformation(): bool
@@ -135,14 +146,25 @@ class Board implements Aggregate
         if ($this->isDeleted) {
             return false;
         }
-        return $this->step->isReadyForTransformation();
+        return $this->step->canBeTransformed();
     }
 
-    private function setStep(ProgressStep $step): void
+    private function setStep(Step $step): void
     {
         $this->step = $step;
-        foreach ($step->getShards() as $shard) {
-            $this->pushEvent(new ShardAddedEvent($this->uuid, $shard));
+        if ($step->getState()->isFinal()) {
+            /** @var FinalStep $step */
+            $this->pushEvent(new FinalBoardTransformedEvent($this->uuid, $step));
+
+            $this->isDeleted = true;
+            $this->pushEvent(new BoardDeletedEvent($this->uuid));
+        } else {
+            /** @var ProgressStep $step */
+            $this->pushEvent(new BoardTransformedEvent($this->uuid, $step));
+
+            foreach ($step->getShards() as $shard) {
+                $this->pushEvent(new ShardAddedEvent($this->uuid, $shard));
+            }
         }
     }
 }

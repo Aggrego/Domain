@@ -6,8 +6,11 @@ namespace Tests\Profile\BoardConstruction;
 
 use Aggrego\Domain\Profile\BoardConstruction\Builder as DomainBuilder;
 use Aggrego\Domain\Profile\BoardConstruction\Exception\UnableToBuildBoardException;
+use Aggrego\Domain\Profile\BoardConstruction\InitialBoardModel\AbstractBoard;
 use Aggrego\Domain\Profile\BoardConstruction\InitialBoardModel\Board;
+use Aggrego\Domain\Profile\BoardConstruction\InitialBoardModel\ProgressiveBoard;
 use Aggrego\Domain\Profile\Profile;
+use Aggrego\Domain\ProgressiveBoard\Step\State;
 use Aggrego\Domain\Shared\ValueObject\Key;
 
 class Builder implements DomainBuilder
@@ -43,7 +46,7 @@ class Builder implements DomainBuilder
         if (!isset($key->getValue()['key'])) {
             throw new UnableToBuildBoardException();
         }
-        $board = new Board($key, $this->profile);
+        $board = new ProgressiveBoard($key, $this->profile, State::createInitial());
         $board->addShard(
             new Key(self::DEFAULT_KEY_MR),
             Profile::createFrom(self::DEFAULT_SOURCE_NAME, self::DEFAULT_SOURCE_VERSION)

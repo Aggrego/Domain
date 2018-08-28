@@ -9,6 +9,7 @@ use Aggrego\Domain\Shared\ValueObject\AbstractStringValueObject;
 final class State extends AbstractStringValueObject
 {
     public const INITIAL = 'initial';
+
     public const FINAL = 'final';
 
     public function __construct(string $value)
@@ -19,6 +20,11 @@ final class State extends AbstractStringValueObject
     public static function createInitial(): self
     {
         return new self(self::INITIAL);
+    }
+
+    public static function createFinal(): self
+    {
+        return new self(self::FINAL);
     }
 
     public function isFinal(): bool

@@ -10,7 +10,6 @@ use Assert\Assertion;
 use Countable;
 use Iterator;
 use IteratorAggregate;
-use Traversable;
 
 class Collection implements Countable, IteratorAggregate
 {
